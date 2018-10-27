@@ -138,7 +138,7 @@ with open('flux_header.h', 'w') as fout:
     fout.write('#define FLUX_POWER_UP_LOOPS {}\n'.format(loops))
     fout.write('\n')
     fout.write('inline unsigned int flux_time (void) {\n')
-    fout.write('    return ((now - switch_start) * FLUX_ON_COUNT) / (FLUX_FRAME_MS * FLUX_POWER_UP_LOOPS);\n')
+    fout.write('    return min(FLUX_ON_COUNT - 1, ((now - switch_start) * FLUX_ON_COUNT) / (FLUX_FRAME_MS * FLUX_POWER_UP_LOOPS));\n')
     fout.write('}\n')
     fout.write('\n')
     

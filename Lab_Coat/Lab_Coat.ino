@@ -11,6 +11,7 @@ APA102<dataPin, clockPin> ledPort;
 
 unsigned long now;
 unsigned long switch_start;
+unsigned long switch_stop;
 unsigned long lastFire;
 
 // Set the number of LEDs
@@ -114,6 +115,15 @@ inline uint8_t get_curve(unsigned int i) {
     return curve[((now * frequencies[i]) / F_DEN) % CURVE_LENGTH];
 }
 
+#define RAMP_FREQ 4
+inline uint8_t get_ramp_up (void) {
+    return curve[min(CURVE_LENGTH / 2, ((now - knife_start) * RAMP_FREQ) / (MS_IN_S * CURVE_LENGTH))];
+}
+inline uint8_t get_ramp_down (void) {
+    return curve[min(CURVE_LENGTH / 2, ((now - knife_stop)  * RAMP_FREQ) / (MS_IN_S * CURVE_LENGTH)) + (CURVE_LENGTH / 2)];
+}
+
+
 /*
  * PURPOSE:
  *     Set Flux Capactior LEDS
@@ -208,39 +218,69 @@ void set_flux_LEDs (void) {
 
 void setup()
 {
-    Serial.begin(9600);
-    lastFire = 0;
+    Serial.begin(9600); // debug
+    pinMode(LED_BUILTIN, OUTPUT); // debug
+    digitalWrite(LED_BUILTIN, LOW); //debug
+    
+    now = 0;
+    
+    lastFireTime = 0;
     
     pinMode(KNIFE_SW_PIN, INPUT_PULLUP);
-    pinMode(LED_BUILTIN, OUTPUT);
+    knife_state = false;
+    knife_start = 0;
+    knife_stop = 0;
+    
+    // toggle switches
+    pinMode(TOGGLE_1_SW_PIN, INPUT_PULLUP);
+    toggle_1_state = false;
+    pinMode(TOGGLE_2_SW_PIN, INPUT_PULLUP);
+    toggle_2_state = false;
     
     // zero all colors
     for (int i = 0; i < FULL_LED_COUNT; i++) {
       colors[i] = rgb_color(0, 0, 0);
     }
     ledPort.write(colors, FULL_LED_COUNT, brightness);
-
-    now = millis();
-    switch_start = now;
 }
 
 void loop()
 {
     now = millis();
-    if (digitalRead(KNIFE_SW_PIN)) {
-        switch_start = now;
-        digitalWrite(LED_BUILTIN, LOW);
-    } else {
-        digitalWrite(LED_BUILTIN, HIGH);
+    
+    // knife switch
+    prev_knife_state = knife_state;
+    knife_state = !digitalRead(KNIFE_SW_PIN); // invert reading
+    if (knife_state != prev_knife_state) {
+        if (knife_state) {
+            knife_start = now;
+            digitalWrite(LED_BUILTIN, HIGH); // debug
+        } else {
+            knife_stop = now;
+            digitalWrite(LED_BUILTIN, LOW); //debug
+        }
     }
     
-    // points
-    for (unsigned int i = 0; i < POINT_LED_COUNT; i++) {
-        point_colors[i] = rgb_color(get_curve(i), 0, 0);
-    }
+    // toggle switches
+    toggle_1_state = digitalRead(TOGGLE_1_SW_PIN);
+    toggle_2_state = digitalRead(TOGGLE_2_SW_PIN);
     
+    // flux capacitor
     set_flux_LEDs();
 
+    // points
+
+void set_point_LEDs (void) {
+    if (knife_state) {
+        for (unsigned int i = 0; i < POINT_LED_COUNT; i++) {
+            point_colors[i] = rgb_color(max(get_ramp_up(), get_curve(i)), 0, 0);
+        }
+    } else {
+        for (unsigned int i = 0; i < POINT_LED_COUNT; i++) {
+            point_colors[i] = rgb_color(get_curve(i), 0, 0);
+        }
+    }
+}
     // fire
     if (now - lastFire > 100) {
         for (unsigned int i = 0; i < 20; i++) {
@@ -248,5 +288,7 @@ void loop()
         }
         lastFire = now;
     }
+    
+    // draw
     ledPort.write(colors, FULL_LED_COUNT, brightness);
 }

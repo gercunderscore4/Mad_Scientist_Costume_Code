@@ -1,7 +1,7 @@
 // Create an object for writing to the LED strip.
 #include <APA102.h>
-#define LED_DATA_PIN 11
-#define LED_CLOCK_PIN 12
+#define LED_DATA_PIN 12
+#define LED_CLOCK_PIN 11
 APA102<LED_DATA_PIN, LED_CLOCK_PIN> ledPort;
 
 #define BRIGHTNESS 10 //31
@@ -213,14 +213,20 @@ inline uint8_t get_ramp_down (void) {
 }
 
 void set_point_LEDs (void) {
-    uint8_t ramp = knife_state ? get_ramp_up() : get_ramp_down();
-    for (unsigned int i = 0; i < POINT_LED_COUNT; i++) {
-        point_colors[i] = rgb_color(max(ramp, get_curve(i)), 0, 0);
+    if (toggle_1_state) {
+        uint8_t ramp = knife_state ? get_ramp_up() : get_ramp_down();
+        for (unsigned int i = 0; i < POINT_LED_COUNT; i++) {
+            point_colors[i] = rgb_color(max(ramp, get_curve(i)), 0, 0);
+        }
+    } else {
+        for (unsigned int i = 0; i < POINT_LED_COUNT; i++) {
+            point_colors[i] = rgb_color(0, 0, 0);
+        }
     }
 }
 
 void set_fire_LEDs (void) {
-    if (knife_state && ((now - knife_start) > (MS_IN_S / (RAMP_FREQ * 2)))) {
+    if (toggle_1_state && knife_state && ((now - knife_start) > (MS_IN_S / (RAMP_FREQ * 2)))) {
         if (now - last_fire > FIRE_PERIOD) {
             for (unsigned int i = 0; i < FIRE_CHANGE_COUNT; i++) {
                 fire_colors[random(FIRE_LED_COUNT)] = blackbody[GET_BLACKBODY_INDEX];
